@@ -1,65 +1,358 @@
+"use client";
+
 import Image from "next/image";
+import { useCallback, useMemo, useState } from "react";
+
+type GenerateResponse = {
+  imageUrl: string;
+};
+
+type ErrorResponse = {
+  error: string;
+};
+
+type GeneratedImage = {
+  id: string;
+  url: string;
+  prompt: string;
+  size: string;
+  timestamp: number;
+};
+
+const SAMPLE_PROMPTS = [
+  "レトロなヴェイパーウェーブの彫像、ピンク背景、グリッチ",
+  "ポップアートのバナナ、ビビッドドット、コミック調",
+  "抽象的な幾何学パターン、バウハウス配色、強コントラスト",
+  "サイバーパンク屋台、モノクロ漫画風、雨の夜",
+];
+
+const SIZE_OPTIONS = [
+  { label: "512px 正方形", value: "512x512" },
+  { label: "768px 正方形", value: "768x768" },
+  { label: "1024px 正方形", value: "1024x1024" },
+];
+
+const parseSize = (value: string) => {
+  const [widthStr, heightStr] = value.split("x");
+  const width = Number(widthStr);
+  const height = Number(heightStr);
+
+  if (Number.isNaN(width) || Number.isNaN(height)) {
+    return { width: 1024, height: 1024 };
+  }
+
+  return { width, height };
+};
+
+const ZapIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M13 2 4 13.5h6.5L9.5 22 20 9.8h-6.4z" />
+  </svg>
+);
+
+const WandIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.5}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <path d="M19 4 4.5 18.5" />
+    <path d="m14 4 1-2 1 2 2 .5-2 .5-1 2-1-2-2-.5z" />
+    <path d="m5 11 1-.5 1 .5.5 1-.5 1-1 .5-1-.5-.5-1z" />
+  </svg>
+);
+
+const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 32 32"
+    fill="currentColor"
+    aria-hidden="true"
+    {...props}
+  >
+    <path d="M17 3.5 18.5 8 23 9.5 18.5 11 17 15.5 15.5 11 11 9.5 15.5 8z" />
+    <path d="M9.5 16 11 19l3 1.5-3 1.5L9.5 25 8 22l-3-1.5 3-1.5z" />
+    <path d="m23 18 1.5 4L29 24l-4.5 2-1.5 4-1.5-4L17 24l4.5-2z" />
+  </svg>
+);
 
 export default function Home() {
+  const [prompt, setPrompt] = useState("");
+  const [size, setSize] = useState("1024x1024");
+  const [images, setImages] = useState<GeneratedImage[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const trimmedPrompt = useMemo(() => prompt.trim(), [prompt]);
+
+  const performGeneration = useCallback(
+    async (params?: { prompt?: string; size?: string }) => {
+      const requestedPrompt = params?.prompt?.trim() ?? trimmedPrompt;
+      const requestedSize = params?.size ?? size;
+
+      if (!requestedPrompt) {
+        setErrorMessage("プロンプトを入力してください。");
+        return;
+      }
+
+      setIsGenerating(true);
+      setErrorMessage(null);
+
+      try {
+        const response = await fetch("/api/generate-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: requestedPrompt,
+            size: requestedSize,
+          }),
+        });
+
+        const data = (await response.json()) as
+          | GenerateResponse
+          | ErrorResponse;
+
+        if (!response.ok) {
+          setErrorMessage(
+            (data as ErrorResponse).error ?? "エラーが発生しました。",
+          );
+          return;
+        }
+
+        const { imageUrl } = data as GenerateResponse;
+
+        setImages((prev) => [
+          {
+            id: crypto.randomUUID(),
+            url: imageUrl,
+            prompt: requestedPrompt,
+            size: requestedSize,
+            timestamp: Date.now(),
+          },
+          ...prev,
+        ]);
+      } catch (error) {
+        console.error("Failed to generate image", error);
+        setErrorMessage("ネットワークエラーが発生しました。");
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [size, trimmedPrompt],
+  );
+
+  const handleSubmit = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      await performGeneration();
+    },
+    [performGeneration],
+  );
+
+  const handleRegenerate = useCallback(
+    async (image: GeneratedImage) => {
+      setPrompt(image.prompt);
+      setSize(image.size);
+      await performGeneration({ prompt: image.prompt, size: image.size });
+    },
+    [performGeneration],
+  );
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="relative min-h-screen bg-[#FFDEE9] pb-24 font-[var(--font-space-mono)] text-black">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-0 bg-cross opacity-35"
+      />
+      <div className="relative z-10 mx-auto max-w-6xl px-4 py-12">
+        <header className="relative mb-20 border-4 border-black bg-[#FF0080] p-8 text-white shadow-[8px_8px_0px_0px_#000] transition-transform duration-300 hover:rotate-0 md:rotate-1">
+          <div className="flex flex-col gap-4">
+            <p className="text-4xl font-bold uppercase leading-[0.85] tracking-tighter drop-shadow-[4px_4px_0px_rgba(0,0,0,0.7)] md:text-7xl">
+              Prism AI スタジオ
+            </p>
+            <span className="w-fit -rotate-1 bg-black px-4 py-1 text-base font-bold uppercase tracking-[0.2em] text-[#FAFF00] shadow-[4px_4px_0px_rgba(255,255,255,1)] md:text-xl">
+              Visual Reality Engine v3.0
+            </span>
+            <p className="max-w-2xl text-sm uppercase tracking-[0.35em] text-slate-100">
+              Google Gemini 画像生成プレイグラウンド
+            </p>
+          </div>
+          <div className="absolute -right-6 -top-6 flex h-16 w-16 items-center justify-center rounded-full border-4 border-black bg-[#FAFF00] text-black shadow-[4px_4px_0px_0px_#000]">
+            <ZapIcon className="h-8 w-8" />
+          </div>
+        </header>
+
+        <section className="relative">
+          <form
+            onSubmit={handleSubmit}
+            className="relative z-10 transform border-4 border-black bg-white p-8 shadow-[12px_12px_0px_0px_#000] md:-rotate-1"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <label className="flex flex-col gap-4">
+              <span className="text-xs font-bold uppercase tracking-[0.5em] text-black">
+                プロンプト
+              </span>
+              <textarea
+                className="h-32 w-full border-4 border-black px-6 py-4 text-xl uppercase tracking-tight outline-none focus:bg-[#FAFF00]"
+                placeholder="例: ネオンに照らされた東京の雨夜をシネマティックに描いて"
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+              />
+            </label>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              {SIZE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSize(option.value)}
+                  className={`border-4 border-black px-5 py-2 text-sm font-bold uppercase tracking-[0.2em] transition-transform ${
+                    size === option.value
+                      ? "bg-[#FAFF00] shadow-[6px_6px_0px_0px_#000]"
+                      : "bg-white hover:-translate-y-1 hover:-translate-x-1 hover:bg-[#FAFF00]/70"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-8 flex flex-col gap-6 md:flex-row md:items-center">
+              <button
+                type="submit"
+                disabled={isGenerating}
+                className="flex w-full items-center justify-center gap-3 border-4 border-black bg-black px-8 py-4 text-xl font-bold uppercase text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40 md:w-auto"
+              >
+                {isGenerating ? (
+                  <span className="flex items-center gap-3">
+                    <span className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    生成中です…
+                  </span>
+                ) : (
+                  <>
+                    <WandIcon className="h-7 w-7" />
+                    画像を生成する
+                  </>
+                )}
+              </button>
+              <p className="text-sm uppercase tracking-[0.3em] text-black">
+                {isGenerating
+                  ? "Gemini がピクセルを組み立てています"
+                  : "Neo-Brutal な結果をすぐに表示"}
+              </p>
+            </div>
+          </form>
+
+          {errorMessage && (
+            <p className="mt-8 border-4 border-black bg-red-500 px-6 py-4 text-center text-base font-bold uppercase text-white shadow-[8px_8px_0px_0px_#000]">
+              エラー: {errorMessage}
+            </p>
+          )}
+        </section>
+
+        <section className="mt-16">
+          <div className="mb-8 flex items-center gap-4">
+            <div className="h-1 flex-1 bg-black" />
+            <p className="rotate-1 border-4 border-black bg-white px-4 py-1 text-base font-bold uppercase shadow-[4px_4px_0px_0px_#000]">
+              アイデアサンプル
+            </p>
+            <div className="h-1 flex-1 bg-black" />
+          </div>
+          <div className="flex flex-wrap justify-center gap-4">
+            {SAMPLE_PROMPTS.map((sample) => (
+              <button
+                key={sample}
+                type="button"
+                onClick={() => setPrompt(sample)}
+                className="border-2 border-black bg-white px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] transition hover:bg-[#FAFF00] hover:shadow-[6px_6px_0px_0px_#000]"
+              >
+                {sample}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {images.length > 0 ? (
+          <section className="mt-20">
+            <div className="mb-10 flex items-center justify-between">
+              <h2 className="text-3xl font-bold uppercase tracking-tighter">
+                最新の生成結果
+              </h2>
+              <p className="text-xs uppercase tracking-[0.4em] text-black/60">
+                {images.length} 件
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {images.map((image) => {
+                const dimensions = parseSize(image.size);
+                return (
+                  <article
+                    key={image.id}
+                    className="group relative border-4 border-black bg-white shadow-[12px_12px_0px_0px_#000] transition hover:-translate-y-2 hover:shadow-[16px_16px_0px_0px_#000]"
+                  >
+                    <span className="absolute left-4 top-4 -rotate-6 border-4 border-black bg-[#FAFF00] px-3 py-1 text-xs font-bold uppercase shadow-[4px_4px_0px_0px_#000]">
+                      生成済み
+                    </span>
+                    <div className="relative overflow-hidden border-b-4 border-black">
+                      <Image
+                        src={image.url}
+                        alt={image.prompt}
+                        width={dimensions.width}
+                        height={dimensions.height}
+                        unoptimized
+                        className="h-full w-full object-cover"
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/0 opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
+                        <button
+                          type="button"
+                          onClick={() => handleRegenerate(image)}
+                          disabled={isGenerating}
+                          className="border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-black transition hover:bg-[#FAFF00] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          再生成
+                        </button>
+                        <a
+                          href={image.url}
+                          download="generated.png"
+                          className="border-2 border-black bg-black px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-white transition hover:bg-white hover:text-black"
+                        >
+                          DL
+                        </a>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <p className="truncate text-sm uppercase tracking-[0.15em]">
+                        {image.prompt}
+                      </p>
+                      <div className="mt-2 flex items-center justify-between text-xs uppercase tracking-[0.3em] text-black/60">
+                        <span>
+                          {new Date(image.timestamp).toLocaleTimeString("ja-JP")}
+                        </span>
+                        <span>{image.size}</span>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ) : (
+          <div className="mt-32 select-none text-center opacity-60">
+            <div className="mb-4 flex justify-center text-black/40">
+              <SparklesIcon className="h-32 w-32" />
+            </div>
+            <p className="inline-block -rotate-3 border-4 border-black bg-black px-4 py-2 text-2xl font-bold uppercase tracking-tight text-white">
+              データなし
+            </p>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }

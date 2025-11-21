@@ -1,26 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #ffdee9;
+  --foreground: #050505;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-space-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+*::selection {
+  background: #ff0080;
+  color: white;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-space-mono), var(--font-noto-sans-jp),
+    "Noto Sans JP", "Hiragino Sans", system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.bg-cross {
+  background-image:
+    radial-gradient(circle, rgba(0, 0, 0, 0.25) 12%, transparent 13%),
+    radial-gradient(circle, rgba(0, 0, 0, 0.25) 12%, transparent 13%);
+  background-size: 32px 32px;
+  background-position: 0 0, 16px 16px;
 }
