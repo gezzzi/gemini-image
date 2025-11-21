@@ -27,13 +27,38 @@ const SAMPLE_PROMPTS = [
 ];
 
 const SIZE_OPTIONS = [
-  { label: "512px 正方形", value: "512x512" },
-  { label: "768px 正方形", value: "768x768" },
-  { label: "1024px 正方形", value: "1024x1024" },
+  { label: "横向き 21:9", value: "21:9" },
+  { label: "横向き 16:9", value: "16:9" },
+  { label: "横向き 4:3", value: "4:3" },
+  { label: "横向き 3:2", value: "3:2" },
+  { label: "正方形 1:1", value: "1:1" },
+  { label: "縦向き 9:16", value: "9:16" },
+  { label: "縦向き 3:4", value: "3:4" },
+  { label: "縦向き 2:3", value: "2:3" },
+  { label: "その他 5:4", value: "5:4" },
+  { label: "その他 4:5", value: "4:5" },
 ];
 
+const RATIO_DIMENSIONS: Record<string, { width: number; height: number }> = {
+  "21:9": { width: 1680, height: 720 },
+  "16:9": { width: 1280, height: 720 },
+  "4:3": { width: 1200, height: 900 },
+  "3:2": { width: 1200, height: 800 },
+  "1:1": { width: 1024, height: 1024 },
+  "9:16": { width: 720, height: 1280 },
+  "3:4": { width: 900, height: 1200 },
+  "2:3": { width: 800, height: 1200 },
+  "5:4": { width: 1280, height: 1024 },
+  "4:5": { width: 1024, height: 1280 },
+};
+
 const parseSize = (value: string) => {
-  const [widthStr, heightStr] = value.split("x");
+  const ratioPreset = RATIO_DIMENSIONS[value];
+  if (ratioPreset) return ratioPreset;
+
+  const [widthStr, heightStr] = value.includes("x")
+    ? value.split("x")
+    : value.split(":");
   const width = Number(widthStr);
   const height = Number(heightStr);
 
@@ -82,7 +107,7 @@ const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
-  const [size, setSize] = useState("1024x1024");
+  const [size, setSize] = useState("1:1");
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -221,6 +246,9 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            <p className="mt-2 text-xs font-bold uppercase tracking-[0.3em] text-black">
+              解像度ではなく比率を選択。比率に合わせた推奨サイズで生成します。
+            </p>
 
             <div className="mt-8 flex flex-col gap-6 md:flex-row md:items-center">
               <button
